@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+  html, body { width: 100%; height: 100%; overflow: hidden;
+    font-family: Georgia, "Times New Roman", serif; }
+  body {
+    background:
+      radial-gradient(ellipse at 50% 18%, rgba(120, 90, 40, .18), transparent 60%),
+      radial-gradient(ellipse at 50% 110%, rgba(0, 0, 0, .85), transparent 70%),
+      linear-gradient(#0d0a07, #17110a);
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .05;
+    background: repeating-linear-gradient(0deg, #fff 0 1px, transparent 1px 3px);
+  }
+  .screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .panel {
+    width: 430px; padding: 34px 40px 26px; position: relative;
+    background: linear-gradient(160deg, rgba(24, 18, 11, .96), rgba(10, 7, 4, .97));
+    border: 1px solid #6d5730;
+    box-shadow: 0 0 0 4px rgba(109, 87, 48, .25), 0 30px 80px rgba(0, 0, 0, .8);
+    animation: rise .5s ease both;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+  .panel::before, .panel::after {
+    content: ""; position: absolute; width: 26px; height: 26px; border: 2px solid #c9a227;
+  }
+  .panel::before { top: -2px; left: -2px; border-right: none; border-bottom: none; }
+  .panel::after  { bottom: -2px; right: -2px; border-left: none; border-top: none; }
+
+  .deco-line { height: 1px; margin: 12px 0 4px;
+    background: linear-gradient(90deg, transparent, #8a6d3b, transparent); }
+
+  h1 { text-align: center; color: #c9a227; font-size: 26px; font-weight: normal;
+    letter-spacing: .45em; text-indent: .45em; }
+  .subtitle { text-align: center; color: #8d7b58; font-size: 11px;
+    letter-spacing: .35em; text-transform: uppercase; margin-top: 6px; }
+
+  .tabs { display: flex; margin-top: 22px; border-bottom: 1px solid #3d3220; }
+  .tab { flex: 1; text-align: center; padding: 10px 0; cursor: pointer;
+    color: #8d7b58; font-size: 12px; letter-spacing: .25em; text-transform: uppercase;
+    border-bottom: 2px solid transparent; transition: .2s; }
+  .tab:hover { color: #b3a179; }
+  .tab.active { color: #e5d9bd; border-bottom-color: #c9a227; }
+
+  .field { margin-top: 18px; }
+  label { display: block; color: #8d7b58; font-size: 10px;
+    letter-spacing: .3em; text-transform: uppercase; margin-bottom: 6px; }
+  input { width: 100%; padding: 9px 2px; background: transparent; border: none;
+    border-bottom: 1px solid #4a3d26; color: #e5d9bd; font-size: 15px;
+    font-family: inherit; outline: none; transition: .2s; }
+  input:focus { border-bottom-color: #c9a227; }
+  input::placeholder { color: #4f4433; }
+
+  .hint { margin-top: 5px; font-size: 11px; color: #5d5140; min-height: 14px; }
+  .hint.ok  { color: #a3893c; }
+  .hint.err { color: #b0503f; }
+
+  .status { margin-top: 14px; text-align: center; font-size: 13px;
+    min-height: 18px; color: #b0503f; font-style: italic; }
+  .status.ok { color: #c9a227; }
+
+  .btn { display: block; width: 100%; margin-top: 18px; padding: 13px 0;
+    background: transparent; border: 1px solid #c9a227; color: #c9a227;
+    font-family: inherit; font-size: 13px; letter-spacing: .4em; text-indent: .4em;
+    text-transform: uppercase; cursor: pointer; transition: .25s; }
+  .btn:hover:not([disabled]) { background: #c9a227; color: #17110a; }
+  .btn:active:not([disabled]) { transform: translateY(1px); }
+  .btn[disabled] { opacity: .4; cursor: default; }
+
+  .foot { margin-top: 18px; text-align: center; color: #5d5140; font-size: 10px;
+    letter-spacing: .25em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+  <div class="screen">
+    <div class="panel">
+      <h1>MAFIA II</h1>
+      <div class="subtitle">Empire Bay · Онлайн</div>
+      <div class="deco-line"></div>
+
+      <div class="tabs">
+        <div class="tab active" id="tabLogin">Вход</div>
+        <div class="tab" id="tabRegister">Регистрация</div>
+      </div>
+
+      <div class="field">
+        <label>Логин</label>
+        <input id="login" maxlength="20" autocomplete="off" spellcheck="false">
+      </div>
+
+      <div class="field" id="fieldEmail" style="display:none">
+        <label>E-mail</label>
+        <input id="email" autocomplete="off" spellcheck="false">
+        <div class="hint" id="hintEmail"></div>
+      </div>
+
+      <div class="field">
+        <label>Пароль</label>
+        <input id="password" type="password">
+        <div class="hint" id="hintPass"></div>
+      </div>
+
+      <div class="field" id="fieldRepeat" style="display:none">
+        <label>Повторите пароль</label>
+        <input id="passwordRepeat" type="password">
+        <div class="hint" id="hintRepeat"></div>
+      </div>
+
+      <div class="status" id="status"></div>
+      <button class="btn" id="submit" disabled>Войти</button>
+      <div class="foot">Empire Bay · 1940-е</div>
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  const LOGIN_RE = /^[A-Za-z0-9_]{3,20}$/;
+
+  let mode = "login";
+
+  function setMode(next) {
+    mode = next;
+    $("tabLogin").classList.toggle("active", next === "login");
+    $("tabRegister").classList.toggle("active", next === "register");
+    $("fieldEmail").style.display  = next === "register" ? "" : "none";
+    $("fieldRepeat").style.display = next === "register" ? "" : "none";
+    $("submit").textContent = next === "register" ? "Зарегистрироваться" : "Войти";
+    $("status").textContent = "";
+    validate();
+  }
+
+  function validate() {
+    const login  = $("login").value.trim();
+    const pass   = $("password").value;
+    const repeat = $("passwordRepeat").value;
+    const email  = $("email").value.trim();
+
+    const loginOk  = LOGIN_RE.test(login);
+    const passOk   = pass.length >= 6;
+    const repeatOk = mode !== "register" || pass === repeat;
+    const emailOk  = mode !== "register" || EMAIL_RE.test(email);
+
+    const hE = $("hintEmail"), hP = $("hintPass"), hR = $("hintRepeat");
+    hE.className = hP.className = hR.className = "hint";
+
+    if (mode === "register" && email) {
+      hE.textContent = emailOk ? "e-mail выглядит верно" : "некорректный e-mail";
+      hE.classList.add(emailOk ? "ok" : "err");
+    }
+    if (pass) {
+      hP.textContent = passOk ? "" : "минимум 6 символов";
+      if (!passOk) hP.classList.add("err");
+    }
+    if (mode === "register" && repeat) {
+      hR.textContent = repeatOk ? "пароли совпадают" : "пароли не совпадают";
+      hR.classList.add(repeatOk ? "ok" : "err");
+    }
+
+    $("submit").disabled = !(loginOk && passOk && repeatOk && emailOk);
+  }
+
+  $("tabLogin").addEventListener("click", () => setMode("login"));
+  $("tabRegister").addEventListener("click", () => setMode("register"));
+  for (const id of ["login", "email", "password", "passwordRepeat"]) {
+    $(id).addEventListener("input", validate);
+    $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") $("submit").click(); });
+  }
+
+  $("submit").addEventListener("click", () => {
+    if ($("submit").disabled) return;
+    callEvent("ui:action", JSON.stringify({
+      type: mode,
+      login: $("login").value.trim(),
+      email: $("email").value.trim(),
+      password: $("password").value,
+      passwordRepeat: $("passwordRepeat").value,
+    }));
+    $("status").textContent = "…";
+  });
+
+  window.addEventListener("auth:show", (e) => {
+    const data = typeof e.detail === "string" ? JSON.parse(e.detail) : (e.detail || {});
+    if (data.login) $("login").value = data.login;
+    setMode("login");
+  });
+
+  window.addEventListener("auth:result", (e) => {
+    const data = typeof e.detail === "string" ? JSON.parse(e.detail) : (e.detail || {});
+    const s = $("status");
+    s.textContent = data.message || "";
+    s.className = "status" + (data.ok ? " ok" : "");
+  });
+
+  setMode("login");
+</script>
+</body>
+</html>

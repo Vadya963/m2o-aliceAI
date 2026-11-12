@@ -1,0 +1,11 @@
+{
+  "name": "mafia-map",
+  "version": "1.0.0",
+  "author": "You",
+  "description": "Открытие карты по клавише M и командам /map, /gps",
+  "mafiahub": {
+    "clientScripts": ["client/main.js"],
+    "serverScripts": ["server/main.js"],
+    "priority": 5
+  }
+}
