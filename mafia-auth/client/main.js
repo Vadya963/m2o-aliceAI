@@ -17,7 +17,7 @@ Events.on("resourceStart", (name) => {
   const width  = (s && (s.width ?? s.x)) || 1920;
   const height = (s && (s.height ?? s.y)) || 1080;
 
-  viewId = Web.createView(`fw://resources/${RESOURCE_NAME}/client/ui/index.html`, {
+  viewId = Web.createView(`fw://resources/${RESOURCE_NAME}/client/ui/auth.html`, {
     width, height, x: 0, y: 0, zIndex: 100, visible: false, focus: false,
   });
 

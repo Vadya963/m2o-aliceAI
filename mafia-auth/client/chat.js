@@ -54,7 +54,7 @@ Events.on("resourceStart", (name) => {
   Web.on(chatViewId, "chat:close", closeInput);
 
   // T — открыть ввод
-  Key.bind("t", "down", openInput);
+  Key.bind("enter", "down", openInput);
 
   // Esc — закрыть, если страница не поймала сама
   Key.bind("escape", "down", () => { if (inputOpen) closeInput(); });

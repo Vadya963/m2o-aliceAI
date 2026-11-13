@@ -9,18 +9,32 @@
 
   #log {
     position: absolute; left: 20px; bottom: 70px; width: 520px;
-    display: flex; flex-direction: column; gap: 2px; pointer-events: none;
-    transition: opacity 0.4s ease; /* плавное затухание */
+    max-height: 55vh;                       /* вся история — с прокруткой */
+    display: flex; flex-direction: column; gap: 2px;
+    overflow-y: auto; overflow-x: hidden;
+    pointer-events: auto;                   /* мышь работает только над лентой */
+    user-select: text;                      /* текст истории можно выделять */
+    padding-right: 2px;
+    transition: opacity 0.4s ease;
+    scrollbar-width: thin; scrollbar-color: #6d5730 transparent;
   }
+  #log::-webkit-scrollbar { width: 6px; }
+  #log::-webkit-scrollbar-track { background: transparent; }
+  #log::-webkit-scrollbar-thumb { background: #6d5730; }
+  #log:not(:hover)::-webkit-scrollbar-thumb { background: transparent; } /* ползунок виден при наведении */
+
   .line {
-    padding: 3px 10px; font-size: 14px; color: #F5E6C8;  /* кремовый текст */
+    flex: none;                             /* строки не сжимаются — скролл честный */
+    padding: 3px 10px; font-size: 14px; color: #F5E6C8;
     background: rgba(10, 7, 4, .55); border-left: 2px solid #6d5730;
   }
-  .line .name { color: #FFD700; }                       /* золотой ник */
+  .line .name { color: #FFD700; }
   .line.system { color: #C9A227; font-style: italic; }
   .line.me { color: #B3A179; font-style: italic; }
   .line.pm { color: #E5D9BD; }
   .line.pm .name { color: #C9A227; }
+  .line.cmd { color: #8D7B58; font-style: italic; }
+  .line.cmd::before { content: "› "; color: #6d5730; }
 
   #inputwrap {
     position: absolute; left: 20px; bottom: 24px; width: 520px;
@@ -50,7 +64,7 @@
   let inputOpen = false;
 
   // ---------- затухание ленты ----------
-  const FADE_DURATION = 10000; // 10 секунд без новых сообщений
+  const FADE_DURATION = 10000;
   let fadeTimer = null;
 
   function showLog() {
@@ -59,7 +73,26 @@
     fadeTimer = setTimeout(() => { logEl.style.opacity = "0.15"; }, FADE_DURATION);
   }
 
-  // ---------- приём строк от сервера ----------
+  // пока курсор или колесо над лентой — не затухаем и держим яркость
+  logEl.addEventListener("mouseenter", showLog);
+  logEl.addEventListener("wheel", showLog);
+  logEl.addEventListener("mouseleave", showLog); // перезапускаем таймер затухания
+
+  // клик по истории не должен рвать фокус открытого ввода
+  logEl.addEventListener("mousedown", () => {
+    if (inputOpen) setTimeout(() => { msg.focus(); }, 0);
+  });
+
+  // ---------- автоскролл ----------
+  let stickBottom = true; // следим, не отмотал ли пользователь историю вверх
+
+  logEl.addEventListener("scroll", () => {
+    stickBottom = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 20;
+  });
+
+  // ---------- история сообщений ----------
+  const MAX_HISTORY = 150;
+
   function addLine(raw) {
     let d;
     try { d = typeof raw === "string" ? JSON.parse(raw) : (raw || {}); }
@@ -76,23 +109,55 @@
       el.textContent = d.text || "";
     }
     logEl.appendChild(el);
-    while (logEl.children.length > 12) logEl.removeChild(logEl.firstChild);
-    showLog(); // новое сообщение — лента яркая
+    while (logEl.children.length > MAX_HISTORY) logEl.removeChild(logEl.firstChild);
+    if (stickBottom) logEl.scrollTop = logEl.scrollHeight; // едем вниз, если не читаем историю
+    showLog();
   }
 
-  window.addEventListener("chat:line",     (e) => addLine(e.detail));
-  window.addEventListener("chat:history",   (e) => {
+  window.addEventListener("chat:line", (e) => addLine(e.detail));
+  window.addEventListener("chat:history", (e) => {
     let d;
     try { d = typeof e.detail === "string" ? JSON.parse(e.detail) : (e.detail || {}); }
     catch (err) { d = {}; }
     (d.lines || []).forEach(addLine);
+    stickBottom = true;
+    logEl.scrollTop = logEl.scrollHeight;
   });
-  window.addEventListener("chat:notice",   (e) => {
+  window.addEventListener("chat:notice", (e) => {
     let d;
     try { d = typeof e.detail === "string" ? JSON.parse(e.detail) : (e.detail || {}); }
     catch (err) { d = {}; }
     addLine({ kind: "system", text: d.message || d.text || "" });
   });
+
+  // ---------- история команд (стрелки вверх/вниз в вводе) ----------
+  const cmdHistory = [];
+  let histIndex = -1;
+  let draft = "";
+
+  function remember(text) {
+    if (cmdHistory[cmdHistory.length - 1] !== text) cmdHistory.push(text);
+    if (cmdHistory.length > 50) cmdHistory.shift();
+    histIndex = -1;
+  }
+
+  function historyUp() {
+    if (!cmdHistory.length) return;
+    if (histIndex === -1) { draft = msg.value; histIndex = cmdHistory.length - 1; }
+    else histIndex = Math.max(0, histIndex - 1);
+    msg.value = cmdHistory[histIndex];
+    const l = msg.value.length;
+    msg.setSelectionRange(l, l);
+  }
+
+  function historyDown() {
+    if (histIndex === -1) return;
+    histIndex++;
+    if (histIndex >= cmdHistory.length) { histIndex = -1; msg.value = draft; }
+    else msg.value = cmdHistory[histIndex];
+    const l = msg.value.length;
+    msg.setSelectionRange(l, l);
+  }
 
   // ---------- открытие / закрытие ввода ----------
   window.addEventListener("chat:openInput", () => {
@@ -118,6 +183,8 @@
   function send() {
     const text = msg.value.trim();
     if (!text) return;
+    remember(text);
+    //if (text.startsWith("/")) addLine({ kind: "cmd", text }); // команды видны в истории у автора
     call("chat:input", JSON.stringify({ text }));
     msg.value = "";
   }
@@ -133,7 +200,7 @@
     if (!inputOpen) return;
     if (e.key === "Enter" || e.keyCode === 13) {
       e.preventDefault();
-      if (!msg.value.trim()) { inputOpen = false; requestClose(); return; } // пусто — закрыть
+      if (!msg.value.trim()) { inputOpen = false; requestClose(); return; }
       send();
     } else if (e.key === "Escape" || e.keyCode === 27) {
       e.preventDefault();
@@ -143,17 +210,21 @@
     }
   });
 
-  // страховка: Enter напрямую на поле
   msg.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.keyCode === 13) {
       e.preventDefault();
       e.stopPropagation();
       if (!msg.value.trim()) { inputOpen = false; requestClose(); return; }
       send();
+    } else if (e.key === "ArrowUp" || e.keyCode === 38) {
+      e.preventDefault();
+      historyUp();
+    } else if (e.key === "ArrowDown" || e.keyCode === 40) {
+      e.preventDefault();
+      historyDown();
     }
   });
 
-  // запускаем затухание сразу при загрузке страницы
   showLog();
 </script>
 </body>
