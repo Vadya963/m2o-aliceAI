@@ -152,7 +152,7 @@ function sendNotice(player, text) {
   player.emit("chat:notice", JSON.stringify({ text }));
 }
 
-function handleChat(player, payload, source) {
+function handleChat(player, payload) {
   const data = asPayload(payload);
   if (!data) return;
 
@@ -305,11 +305,11 @@ Events.onClient("auth:action", (player, raw) => {
 
 // строки из нативного ввода (Enter в игре)
 Events.on("playerChat", (player, text) => {
-  handleChat(player, { text }, "native");
+  handleChat(player, { text });
 });
 
 // строки из нашего веб-чата (T)
 // payload может прийти и строкой, и объектом — asPayload() всё нормализует
 Events.onClient("chat:input", (player, raw) => {
-  handleChat(player, raw, "web");
+  handleChat(player, raw);
 });

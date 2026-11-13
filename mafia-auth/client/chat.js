@@ -9,10 +9,12 @@ const RESOURCE_NAME = "mafia-auth";
 
 let chatViewId = -1;
 let inputOpen = false;
+let nativeChatKiller = -1;
 
 function openInput() {
   if (chatViewId < 0) return;
   if (!inputOpen) {
+    try { Chat.close(); } catch (e) {} // на случай, если нативный ввод открылся первым
     inputOpen = true;
     Web.emit(chatViewId, "chat:openInput");
   }
@@ -39,6 +41,16 @@ Events.on("resourceStart", (name) => {
     `fw://resources/${RESOURCE_NAME}/client/ui/chat.html`,
     { width, height, x: 0, y: 0, zIndex: 90, visible: true, focus: false }
   );
+
+  // нативный оверлей чата не нужен — рендерим всё сами
+  try { Chat.setUIVisible(false); } catch (e) {}
+
+  // глушим нативный ввод чата: открылся — сразу закрываем
+  nativeChatKiller = setInterval(() => {
+    if (Chat.isOpen()) {
+      try { Chat.close(); } catch (e) {}
+    }
+  }, 30);
 
   // ввод из страницы -> на сервер (JSON-строкой, как ждёт сервер)
   Web.on(chatViewId, "chat:input", (payload) => {
@@ -82,4 +94,5 @@ Events.on("resourceStop", (name) => {
   closeInput();
   if (chatViewId >= 0) { try { Web.destroyView(chatViewId); } catch (e) {} }
   chatViewId = -1;
+  clearInterval(nativeChatKiller);
 });
