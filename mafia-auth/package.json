@@ -1,18 +1,20 @@
 {
   "name": "mafia-auth",
-  "version": "1.1.2",
+  "version": "1.1.5",
   "author": "You",
   "description": "Авторизация, кастомный чат и имя персонажа = логин. Стиль Mafia II.",
   "mafiahub": {
     "clientScripts": [
       "client/main.js",
-      "client/chat.js"
+      "client/chat.js",
+      "client/inventory.js"
     ],
     "serverScripts": [
       "server/main.js"
     ],
     "files": [
-      "client/ui/**"
+      "client/ui/**",
+      "client/ui/items/**"
     ],
     "priority": 10
   }

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: transparent;
+    font-family: Georgia, "Times New Roman", serif; pointer-events: none; }
+
+  #inv { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; }
+  #inv.open { display: flex; }
+
+  .panel {
+    pointer-events: auto;
+    display: flex; gap: 12px; padding: 14px;
+    background: rgba(12, 9, 5, .92); border: 1px solid #6d5730;
+    box-shadow: 0 0 40px rgba(0,0,0,.7);
+  }
+
+  /* ---- сетка 8 × 6 ---- */
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(8, 62px);
+    grid-template-rows: repeat(6, 62px);
+    gap: 5px;
+  }
+  .slot {
+    position: relative; background: rgba(38,30,18,.85);
+    border: 1px solid #4f4433; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .slot:hover { border-color: #C9A227; }
+  .slot.sel { border-color: #FFD700; box-shadow: 0 0 8px rgba(255,215,0,.4); }
+  .slot img { width: 44px; height: 44px; image-rendering: auto; }
+  .slot .fallback { color: #8D7B58; font-size: 26px; font-weight: bold; }
+  .slot .cnt {
+    position: absolute; right: 3px; bottom: 1px;
+    color: #F5E6C8; font-size: 12px; text-shadow: 1px 1px 2px #000;
+  }
+
+  /* ---- правая колонка ---- */
+  #side { width: 210px; display: flex; flex-direction: column; gap: 8px; }
+  #side .icon-box {
+    height: 110px; background: rgba(38,30,18,.85); border: 1px solid #4f4433;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #side .icon-box img { width: 84px; height: 84px; }
+  #side .icon-box .fallback { color: #8D7B58; font-size: 44px; font-weight: bold; }
+  #iname { color: #FFD700; font-size: 17px; }
+  #idesc { color: #B3A179; font-size: 13px; min-height: 32px; }
+  .btn {
+    padding: 9px; text-align: center; font-size: 14px; cursor: pointer;
+    border: 1px solid; background: rgba(38,30,18,.85); color: #F5E6C8;
+  }
+  .btn:hover { filter: brightness(1.25); }
+  .btn.use    { border-color: #5c7a3f; color: #b6d98f; }
+  .btn.drop   { border-color: #8a7433; color: #F5E6C8; }
+  .btn.delete { border-color: #7a3f3f; color: #e59b9b; }
+  .btn.disabled { opacity: .35; cursor: default; }
+  .hint { color: #8D7B58; font-size: 12px; margin-top: auto; }
+
+  /* ---- шкалы сытости и жидкости ---- */
+  #bars { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .bar { height: 14px; background: rgba(38,30,18,.9); border: 1px solid #4f4433; position: relative; }
+  .bar .fill { position: absolute; left: 0; top: 0; bottom: 0; transition: width .4s; }
+  .bar.hunger .fill { background: #a5732c; }
+  .bar.thirst .fill { background: #3f6d8a; }
+  .bar span {
+    position: absolute; left: 6px; top: 0; font-size: 11px; line-height: 13px;
+    color: #F5E6C8; text-shadow: 1px 1px 2px #000; z-index: 1;
+  }
+
+  /* ---- всплывающее время от часов ---- */
+  #clock {
+    position: absolute; top: 18%; left: 50%; transform: translateX(-50%);
+    display: none; padding: 12px 28px;
+    background: rgba(12,9,5,.95); border: 1px solid #C9A227;
+    color: #FFD700; font-size: 26px; letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+  <div id="inv">
+    <div class="panel">
+      <div id="grid"></div>
+      <div id="side">
+        <div class="icon-box" id="bigicon"></div>
+        <div id="iname">Выберите предмет</div>
+        <div id="idesc"></div>
+        <div class="btn use" id="b-use">Использовать</div>
+        <div class="btn drop" id="b-drop">Выбросить</div>
+        <div class="btn delete" id="b-delete">Удалить</div>
+        <div id="bars">
+          <div class="bar hunger"><span id="hunger-l">Сытость</span><div class="fill" id="hunger-f"></div></div>
+          <div class="bar thirst"><span id="thirst-l">Жидкость</span><div class="fill" id="thirst-f"></div></div>
+        </div>
+        <div class="hint">Esc — закрыть</div>
+      </div>
+    </div>
+    <div id="clock"></div>
+  </div>
+
+<script>
+  const RESOURCE_NAME = "mafia-auth";
+  const ICON_DIR = `fw://resources/${RESOURCE_NAME}/client/ui/items/`;
+  const SLOTS = 48;
+
+  const invEl    = document.getElementById("inv");
+  const gridEl   = document.getElementById("grid");
+  const clockEl  = document.getElementById("clock");
+  const bigIcon  = document.getElementById("bigicon");
+  const nameEl   = document.getElementById("iname");
+  const descEl   = document.getElementById("idesc");
+
+  let items = {};        // мета предметов с сервера
+  let slots = [];        // 48 ячеек
+  let selected = -1;     // выбранный слот
+
+  function call(name, payload) {
+    try { callEvent(name, payload); }
+    catch (e) { try { callEvent(name, JSON.stringify(payload)); } catch (e2) {} }
+  }
+
+  // ---------- система иконок: PNG с запасным вариантом ----------
+  function iconNode(itemId, size) {
+    const meta = items[itemId];
+    if (!meta) return document.createTextNode("?");
+    const img = document.createElement("img");
+    img.src = ICON_DIR + itemId + ".png"; // ожидаем: cola.png, hotdog.png, medkit.png, watch.png
+    if (size) { img.style.width = size + "px"; img.style.height = size + "px"; }
+    img.onerror = () => { // PNG нет — показываем заглушку с первой буквой
+      const fb = document.createElement("div");
+      fb.className = "fallback";
+      fb.textContent = meta.name.charAt(0);
+      img.replaceWith(fb);
+    };
+    return img;
+  }
+
+  // ---------- отрисовка сетки ----------
+  function render() {
+    gridEl.innerHTML = "";
+    for (let i = 0; i < SLOTS; i++) {
+      const cell = document.createElement("div");
+      cell.className = "slot" + (i === selected ? " sel" : "");
+      const it = slots[i];
+      if (it) {
+        cell.appendChild(iconNode(it.id, 44));
+        if (it.count > 1) {
+          const c = document.createElement("div");
+          c.className = "cnt";
+          c.textContent = it.count;
+          cell.appendChild(c);
+        }
+        cell.title = items[it.id] ? items[it.id].name : it.id;
+      }
+      cell.addEventListener("click", () => { selected = (selected === i ? -1 : i); render(); });
+      gridEl.appendChild(cell);
+    }
+    renderSide();
+  }
+
+  function renderSide() {
+    const it = slots[selected];
+    if (!it) {
+      bigIcon.innerHTML = "";
+      nameEl.textContent = "Выберите предмет";
+      descEl.textContent = "";
+    } else {
+      bigIcon.innerHTML = "";
+      bigIcon.appendChild(iconNode(it.id, 84));
+      nameEl.textContent = (items[it.id] ? items[it.id].name : it.id) + (it.count > 1 ? ` ×${it.count}` : "");
+      descEl.textContent = items[it.id] ? items[it.id].desc : "";
+    }
+  }
+
+  function sendAction(action) {
+    if (selected < 0 || !slots[selected]) return;
+    call("inv:action", JSON.stringify({ action, slot: selected }));
+    if (action !== "use") selected = -1; // после выброса/удаления слот пустеет
+  }
+
+  document.getElementById("b-use").addEventListener("click",    () => sendAction("use"));
+  document.getElementById("b-drop").addEventListener("click",    () => sendAction("drop"));
+  document.getElementById("b-delete").addEventListener("click",  () => sendAction("delete"));
+
+  // ---------- данные от сервера ----------
+  function parse(raw) {
+    try { return typeof raw === "string" ? JSON.parse(raw) : (raw || {}); }
+    catch (e) { return {}; }
+  }
+
+  window.addEventListener("inv:state", (e) => {
+    const d = parse(e.detail);
+    items = d.items || items;
+    slots = d.slots || slots;
+    if (selected >= slots.length) selected = -1;
+    if (selected >= 0 && !slots[selected]) selected = -1;
+    setBars(d.hunger, d.thirst);
+    render();
+  });
+
+  window.addEventListener("inv:bar", (e) => {
+    const d = parse(e.detail);
+    setBars(d.hunger, d.thirst);
+  });
+
+  function setBars(hunger, thirst) {
+    if (typeof hunger === "number") {
+      document.getElementById("hunger-f").style.width = hunger + "%";
+      document.getElementById("hunger-l").textContent = `Сытость ${hunger}%`;
+    }
+    if (typeof thirst === "number") {
+      document.getElementById("thirst-f").style.width = thirst + "%";
+      document.getElementById("thirst-l").textContent = `Жидкость ${thirst}%`;
+    }
+  }
+
+  // ---------- часы: показ времени сервера ----------
+  let clockTimer = null;
+  window.addEventListener("inv:time", (e) => {
+    const d = parse(e.detail);
+    clockEl.textContent = d.text || "";
+    clockEl.style.display = "block";
+    if (clockTimer) clearTimeout(clockTimer);
+    clockTimer = setTimeout(() => { clockEl.style.display = "none"; }, 5000);
+  });
+
+  // ---------- показ/скрытие панели ----------
+  window.addEventListener("inv:show", () => { invEl.classList.add("open"); });
+  window.addEventListener("inv:hide", () => { invEl.classList.remove("open"); });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" || e.keyCode === 27) {
+      e.preventDefault();
+      selected = -1;
+      render();
+      call("inv:close", JSON.stringify({}));
+    }
+  });
+</script>
+</body>
+</html>
