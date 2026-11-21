@@ -6,17 +6,19 @@
     <salt>81dced565beca2a65034afc3743242ba</salt>
     <password>697407746838962791832508a981ffcaf098b99dbd08995d1788c50c2efb4508</password>
     <created>12.11.2026 23:22</created>
-    <lastlogin>14.11.2026 13:30</lastlogin>
+    <lastlogin>21.11.2026 15:36</lastlogin>
   <inventory>
-      <hunger>17</hunger>
-      <thirst>13</thirst>
+      <hunger>100</hunger>
+      <thirst>100</thirst>
+      <item slot="0" id="cola" count="7"/>
+      <item slot="1" id="hotdog" count="8"/>
       <item slot="2" id="watch" count="1"/>
-      <item slot="3" id="medkit" count="4"/>
+      <item slot="3" id="hotdog" count="1"/>
   </inventory>
   <position>
-    <x>-120.00</x>
-    <y>847.76</y>
-    <z>-21.70</z>
-    <rot x="-0.000015" y="-0.000015" z="0.503807" w="0.863798"/>
+    <x>5.76</x>
+    <y>812.16</y>
+    <z>-24.71</z>
+    <rot x="-0.000046" y="-0.000015" z="0.592462" w="0.805570"/>
   </position>
 </account>

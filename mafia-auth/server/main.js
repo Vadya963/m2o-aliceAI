@@ -228,7 +228,7 @@ Events.on("resourceStart", (name) => {
   try { fs.mkdirSync(ACCOUNTS_DIR, { recursive: true }); } catch (e) { /* уже есть */ }
   buildIndex();
   startInvTimers();
-  console.log(`[mafia-auth] готово · аккаунтов в базе: ${steamIndex.size}`);
+  console.log(`готово · аккаунтов в базе: ${steamIndex.size}`);
 });
 
 Events.on("resourceStop", (name) => {
@@ -292,7 +292,7 @@ Events.onClient("auth:action", (player, raw) => {
     restorePosition(player);
 
     broadcastLine("system", "", `${login} вошёл в Empire Bay.`);
-    console.log(`[mafia-auth] вход: ${login}`);
+    console.log(`вход: ${login}`);
     return reply(true, `Добро пожаловать, ${login}!`);
   }
 
@@ -312,7 +312,7 @@ Events.onClient("auth:action", (player, raw) => {
   try {
     saveAccountXML({ name: login, email, steamId: player.steamId, salt, passwordHash });
   } catch (e) {
-    console.error(`[mafia-auth] ошибка записи XML: ${e}`);
+    console.error(`ошибка записи XML: ${e}`);
     return reply(false, "Ошибка сохранения аккаунта");
   }
 
@@ -325,7 +325,7 @@ Events.onClient("auth:action", (player, raw) => {
   restorePosition(player);
 
   broadcastLine("system", "", `${login} вошёл в Empire Bay.`);
-  console.log(`[mafia-auth] регистрация: ${login} (${email})`);
+  console.log(`регистрация: ${login} (${email})`);
   return reply(true, `Аккаунт «${login}» создан. Welcome to Empire Bay!`);
 });
 
@@ -495,10 +495,8 @@ function useItem(player, inv, slot) {
   if (meta.health) {
     let healed = false;
     try {
-      if (typeof player.getHealth() === "number") {
-        player.setHealth(Math.min(100, player.getHealth() + meta.health));
-        healed = true;
-      }
+      player.setHealth(player.getHealth() + meta.health);
+      healed = true;
     } catch (e) { /* в этой сборке API здоровья недоступно */ }
     sendNotice(player, healed ? "Вы использовали аптечку. Здоровье восстановлено." : "Вы использовали аптечку.");
   } else {
